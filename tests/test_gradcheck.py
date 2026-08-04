@@ -24,3 +24,11 @@ def test_gradcheck_linear_layer():
         return td.mse_loss(y, target)
 
     assert td.grad_check(f, W, b)
+
+
+def test_gradcheck_fails_when_an_input_gets_no_gradient():
+    """A function that ignores an input must fail, not silently pass."""
+    def f(a, b):
+        return (a * a).sum()
+
+    assert not td.grad_check(f, np.array([1.0, 2.0]), np.array([3.0]))

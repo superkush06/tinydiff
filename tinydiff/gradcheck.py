@@ -20,8 +20,14 @@ def grad_check(fn, *inputs, eps: float = 1e-6, tol: float = 1e-4) -> bool:
     out.backward()
 
     ok = True
-    for t in inputs:
+    for k, t in enumerate(inputs):
         if t.grad is None:
+            # An input that never received a gradient is a failure, not a
+            # skip: a broken op that forgets to write its grad would
+            # otherwise sail through the checker unnoticed.
+            print(f"grad missing: input {k} (shape {t.data.shape}) has "
+                  f"requires_grad but received no gradient")
+            ok = False
             continue
         flat = t.data.reshape(-1)
         grad_flat = t.grad.reshape(-1)

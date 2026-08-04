@@ -56,3 +56,19 @@ def test_mean_reduces_correctly():
     out = a.mean()
     out.backward()
     np.testing.assert_allclose(a.grad, np.full(4, 0.25))
+
+
+def test_mean_tuple_axis():
+    a = td.Tensor(np.arange(24.0).reshape(2, 3, 4), requires_grad=True)
+    out = td.mean(a, axis=(0, 1))
+    np.testing.assert_allclose(out.data, a.data.mean(axis=(0, 1)))
+    out.sum().backward()
+    np.testing.assert_allclose(a.grad, np.full((2, 3, 4), 1.0 / 6.0))
+
+
+def test_mean_negative_axis():
+    a = td.Tensor(np.arange(12.0).reshape(3, 4), requires_grad=True)
+    out = td.mean(a, axis=-1)
+    np.testing.assert_allclose(out.data, a.data.mean(axis=-1))
+    out.sum().backward()
+    np.testing.assert_allclose(a.grad, np.full((3, 4), 0.25))

@@ -23,7 +23,7 @@ from .ops import (
 from .optim import SGD, Adam
 from .tensor import Tensor
 
-__version__ = "0.1.0"
+__version__ = "0.4.1"
 __all__ = [
     "Tensor",
     "add", "sub", "mul", "div", "matmul", "pow_", "neg",

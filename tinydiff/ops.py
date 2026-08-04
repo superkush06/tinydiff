@@ -65,16 +65,37 @@ def div(a, b) -> Tensor:
 
 
 def matmul(a, b) -> Tensor:
+    """Matrix product with full np.matmul gufunc semantics: (n?,k),(k,m?).
+
+    Backward handles the three things a naive `a.data.T @ out.grad` gets
+    wrong: 1-D operands (promoted to a row/column, then squeezed back),
+    stacked/batched operands (transpose only the last two axes via
+    swapaxes, never `.T` which reverses ALL axes), and broadcast batch
+    dimensions (summed out with _unbroadcast).
+    """
     a, b = _ensure(a), _ensure(b)
     out = Tensor(a.data @ b.data, _children=(a, b), _op="matmul")
 
     def _backward() -> None:
+        A, B, G = a.data, b.data, out.grad
+        # Promote per the gufunc convention: 1-D a is a row (1, k);
+        # 1-D b is a column (k, 1). np.matmul then squeezes those axes
+        # out of the result, so re-insert them into G to match.
+        A2 = A[None, :] if A.ndim == 1 else A
+        B2 = B[:, None] if B.ndim == 1 else B
+        G2 = G
+        if A.ndim == 1 and B.ndim == 1:
+            G2 = G.reshape(1, 1)
+        elif A.ndim == 1:
+            G2 = np.expand_dims(G, axis=-2)
+        elif B.ndim == 1:
+            G2 = np.expand_dims(G, axis=-1)
         if a.requires_grad:
-            a.grad = (np.zeros_like(a.data) if a.grad is None else a.grad) \
-                     + out.grad @ b.data.T
+            dA = _unbroadcast(G2 @ B2.swapaxes(-1, -2), A2.shape).reshape(A.shape)
+            a.grad = (np.zeros_like(A) if a.grad is None else a.grad) + dA
         if b.requires_grad:
-            b.grad = (np.zeros_like(b.data) if b.grad is None else b.grad) \
-                     + a.data.T @ out.grad
+            dB = _unbroadcast(A2.swapaxes(-1, -2) @ G2, B2.shape).reshape(B.shape)
+            b.grad = (np.zeros_like(B) if b.grad is None else b.grad) + dB
 
     out._backward = _backward
     return out
@@ -195,7 +216,13 @@ def sum_(a, axis=None, keepdims: bool = False) -> Tensor:
 
 def mean(a, axis=None, keepdims: bool = False) -> Tensor:
     a = _ensure(a)
-    n = a.data.size if axis is None else a.data.shape[axis]
+    if axis is None:
+        n = a.data.size
+    else:
+        axes = axis if isinstance(axis, tuple) else (axis,)
+        n = 1
+        for ax in axes:
+            n *= a.data.shape[ax]
     return div(sum_(a, axis=axis, keepdims=keepdims), Tensor(float(n)))
 
 
