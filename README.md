@@ -54,7 +54,7 @@ traversal uses an explicit stack, so depth costs memory, not stack frames.
 git clone https://github.com/superkush06/tinydiff.git
 cd tinydiff
 pip install -e ".[dev,plot]"
-pytest          # 124 tests, about 4 seconds
+pytest          # 124 tests, about 3 seconds
 ```
 
 `dev` pulls in pytest and ruff. `plot` pulls in matplotlib, which
@@ -289,12 +289,11 @@ The chain is built so the answer is exactly 2 at any depth, so the last few
 digits are a running total of floating-point drift. The backward pass is pure
 Python. Timed the way panel 3 times it — best of three passes, garbage
 collector paused — one pass over the 100,000-op chain took **300 ms** in the
-run that produced the figure, and every run taken for this README fell between
-**300 ms and 470 ms**, or 3.0 to 4.7 µs per op. The low end is a warm process
-that has already walked the shorter chains; the high end is a cold process
-doing nothing but this. Neither end is an idle machine — load average ran 4.9
-to 6.6 on eight cores throughout — so treat 300 ms as the optimistic figure
-rather than the typical one.
+run that produced the figure. Six cold runs of the same sweep, taken for this
+README on an eight-core laptop at load average 3, gave **268, 271, 271, 272,
+274 and 308 ms** — a median of 272 ms, or about **2.7 µs per op**. Warm and
+cold processes are indistinguishable here; the one outlier is machine load,
+which is the only thing that moves this number much, and it moves it upward.
 
 "Per op" and "per node" are not the same denominator here: `y = y * m` wraps
 the Python float `m` in a `Tensor` of its own, so the walk visits 200,001
@@ -433,9 +432,9 @@ These bound what you can build on this:
   means rewriting every op to compose `Tensor`s — a design change, not a flag.
 - **float64 only**, on CPU, single-threaded. There is no dtype policy and no
   device concept.
-- **Per-op overhead dominates for small tensors.** 3.0 to 4.7 µs of Python per
-  op on the loaded eight-core laptop these figures came from — see Depth for
-  the spread and the caveat. This is a teaching engine and a correctness
+- **Per-op overhead dominates for small tensors.** About 2.7 µs of Python per
+  op on the eight-core laptop these figures came from — see Depth for the
+  measurements. This is a teaching engine and a correctness
   reference, not a fast one; panel 1 is a claim about asymptotics, not about
   beating BLAS.
 - **The graph retains every intermediate** until the root tensor is dropped.
