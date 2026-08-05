@@ -2,7 +2,9 @@
 
 [![ci](https://github.com/superkush06/tinydiff/actions/workflows/ci.yml/badge.svg)](https://github.com/superkush06/tinydiff/actions/workflows/ci.yml)
 
-Reverse-mode automatic differentiation in about 440 lines of NumPy.
+Reverse-mode automatic differentiation in 654 lines of NumPy
+(`wc -l tinydiff/*.py`), or 436 once blank lines, comments and docstrings come
+out.
 
 Run the forward pass once, walk the graph backwards once, and you have every
 partial derivative — all `n` of them — for roughly the cost of the forward
@@ -28,18 +30,23 @@ why reverse mode exists. The exact ratio is a wall-clock measurement, so the
 script prints it and the panel annotates it; repeating it here would only let
 it go stale.
 
-**2 — Correctness.** Every public op crossed with five shape regimes, scored by
+**2 — Correctness.** Fifteen public ops — every one except `neg`, which
+`examples/validate.py` picks up — crossed with five shape regimes, scored by
 the worst relative disagreement with a central-difference estimate: 62
 (op, shape) pairs, worst case `4.2e-09`. The darker cells are the reference
 method's error, not autodiff's: at `eps = 1e-6` central differences are off by
 `2.3e-10` at the median cell and `4.2e-09` at the worst. Dots mark combinations
 that do not exist — a unary op has nothing to broadcast against.
 
-**3 — Depth.** Backward time is linear in graph depth across four decades, and
-a 100,000-op chain returns `dy/dx` correct to `1.1e-11`. The vertical line is
-measured, not quoted: the textbook recursive graph walk raises `RecursionError`
-at 995 ops on this interpreter. tinydiff's traversal uses an explicit stack, so
-depth costs memory, not stack frames.
+**3 — Depth.** Backward time is linear in graph depth across four decades —
+over the nine points of the plotted sweep, from 10 ops to 100,000, the time
+per op stays between 2.3 and 3.0 µs — and a 100,000-op chain returns `dy/dx`
+correct to `1.1e-11`. The vertical line is measured, not quoted: the textbook
+recursive graph walk raises `RecursionError` at 995 ops when `make_figures.py`
+runs the probe. That cliff shifts by a frame or two with how deep the caller
+already is — the same probe under `python -c` gave 996 — so it is a property
+of the interpreter's stack limit, not a constant of the library. tinydiff's
+traversal uses an explicit stack, so depth costs memory, not stack frames.
 
 ## Install
 
@@ -47,7 +54,7 @@ depth costs memory, not stack frames.
 git clone https://github.com/superkush06/tinydiff.git
 cd tinydiff
 pip install -e ".[dev,plot]"
-pytest          # 124 tests, about 5 seconds
+pytest          # 124 tests, about 4 seconds
 ```
 
 `dev` pulls in pytest and ruff. `plot` pulls in matplotlib, which
@@ -235,20 +242,23 @@ correct.
 Panel A: the naive `log(sum(exp(z)))` and the max-shifted form are
 bit-identical until `c = 710`, where the naive one starts returning `inf`.
 Panel B is the important one: at a logit gap of 745 the naive cross-entropy
-does not fail, it returns `744.4401`, half a nat wrong, because the
-probability it took the log of had gone subnormal. `inf` gets noticed; a
-plausible number does not. Panel C sets the limit on the whole exercise: the
-finite-difference reference bottoms out at $3\times10^{-11}$, so no
+does not fail, it returns `744.4401` where the exact answer is `745.000000` —
+0.56 of a nat wrong — because the probability it took the log of had gone
+subnormal. `inf` gets noticed; a plausible number does not. Panel C sets the
+limit on the whole exercise: the finite-difference reference bottoms out at
+$3.2\times10^{-11}$ (median over $h \in [3\!\times\!10^{-7}, 3\!\times\!10^{-5}]$,
+where the U in $h$ is a round-off sawtooth rather than a curve), so no
 gradient-check tolerance below about `1e-9` means anything, and the closed
-forms in section 2 are what pin the last digits.
+forms in section 1 are what pin the last digits.
 
 The full ledger — claim, our value, reference value, source — is in
 [`docs/validation.md`](docs/validation.md), including a section on the eight
 places tinydiff does *not* match its reference, and why each one is there.
 
-`tests/test_properties.py` covers the other half: 200 randomised draws per
-invariant, for statements that must hold on every input rather than on a
-fixture — the directional derivative, linearity of the VJP, Euler
+`tests/test_properties.py` covers the other half: seventeen invariants at 200
+randomised draws each (21 collected cases, since one is parametrised), for
+statements that must hold on every input rather than on a fixture. Ten of the
+seventeen: the directional derivative, linearity of the VJP, Euler
 homogeneity, fan-out accumulation, broadcast conservation, the matmul
 adjoint identity at every operand rank, traversal order, softmax rows
 summing to zero, convexity as a monotone gradient, and Adam's scale-free
@@ -276,9 +286,20 @@ print(f"{k} ops deep, dy/dx = {float(x.grad):.12f}")
 ```
 
 The chain is built so the answer is exactly 2 at any depth, so the last few
-digits are a running total of floating-point drift. The backward pass takes
-about 300 ms of pure Python, roughly 3 µs per node; panel 3 has the
-measurement.
+digits are a running total of floating-point drift. The backward pass is pure
+Python. Timed the way panel 3 times it — best of three passes, garbage
+collector paused — one pass over the 100,000-op chain took **300 ms** in the
+run that produced the figure, and every run taken for this README fell between
+**300 ms and 470 ms**, or 3.0 to 4.7 µs per op. The low end is a warm process
+that has already walked the shorter chains; the high end is a cold process
+doing nothing but this. Neither end is an idle machine — load average ran 4.9
+to 6.6 on eight cores throughout — so treat 300 ms as the optimistic figure
+rather than the typical one.
+
+"Per op" and "per node" are not the same denominator here: `y = y * m` wraps
+the Python float `m` in a `Tensor` of its own, so the walk visits 200,001
+nodes to do 100,000 multiplications, and the cost per *node* is half the
+number above.
 
 ## Examples
 
@@ -301,7 +322,8 @@ epoch  999: loss=0.0002  acc=100%
 ```
 
 `fit_sine.py` — 256 points of `sin(x)` on `[-3, 3]`, a 1-32-32-1 ReLU stack,
-Adam at 0.01. Mean squared error falls three orders of magnitude in 200 epochs:
+Adam at 0.01. Mean squared error falls by a factor of 840 over 200 epochs —
+2.9 decades, not quite the round three:
 
 ```
 epoch    0: loss=1.339921
@@ -316,8 +338,11 @@ noise draw and scored on another:
 
 ```
 epoch    0: loss=0.8808  train=50.0%  test=50.0%
+epoch  250: loss=0.4155  train=70.8%  test=67.8%
 epoch  500: loss=0.2527  train=88.5%  test=85.2%
+epoch  750: loss=0.0641  train=98.8%  test=96.2%
 epoch 1000: loss=0.0190  train=99.8%  test=98.2%
+epoch 1250: loss=0.0049  train=100.0%  test=98.8%
 epoch 1499: loss=0.0019  train=100.0%  test=98.8%
 ```
 
@@ -327,15 +352,24 @@ Three readings. Held-out accuracy tracks training accuracy the whole way down:
 100% train against 98.8% held out is a fit, not memorisation. The middle panel
 draws the *held-out* points on a region learned from the training draw; the
 mistakes are out at the rim, where the arms crowd. In the gradient panel all
-three layers carry gradients of the same order throughout, so nothing vanishes
-on the way back through two ReLUs. The three-decade drop after epoch 800 is
-convergence, not a vanishing gradient — the loss falls over the same epochs,
-from 0.064 to 0.002.
+three layers carry gradients of the same order throughout — the widest gap
+between the three EMA curves at any epoch is 0.82 decades, at epoch 24, and it
+stays under 0.5 decades from epoch 250 onwards — so nothing vanishes on the
+way back through two ReLUs. The drop over the last third is convergence, not a
+vanishing gradient: from epoch 750 to epoch 1499 the three EMA curves fall
+1.50, 1.72 and 1.82 decades, and the loss falls 1.53 decades over exactly
+those epochs — `0.0641` to `0.0019`, both printed above. Three decades is the
+height of the panel, not the size of any drop in it; the largest fall a single
+curve makes across the whole run is 2.83 decades, `Linear(32, 2)` from epoch 0
+to epoch 1499.
 
 `transformer_block.py` — one transformer feed-forward sublayer (LayerNorm →
 projection → GELU → projection → residual → unembedding → cross-entropy),
 built twice on the same parameters: once with a hand-derived NumPy backward
-pass, once as tinydiff expressions. Every gradient is compared.
+pass, once as tinydiff expressions. Every gradient is compared. The real
+output prints nine rows every time — `gamma beta W1 b1 W2 b2 Wu bu X`; the
+blocks below are trimmed to three of them, and then to the single row each
+injected bug moves. `...` marks where rows were cut.
 
 ```
 forward loss   hand-written 3.828826741946   tinydiff 3.828826741946   gap 0.0e+00
@@ -343,7 +377,9 @@ forward loss   hand-written 3.828826741946   tinydiff 3.828826741946   gap 0.0e+
 correct hand-derived backward pass
   parameter  max rel gap       cosine
   gamma        1.72e-16   1.00000000
+  ...
   W1           2.31e-16   1.00000000
+  ...
   X            3.06e-16   1.00000000
   -> worst disagreement 4.8e-16; the two derivations are the same function.
 ```
@@ -355,12 +391,19 @@ and shows what they cost:
 ```
 injected bug: b1 gradient not summed over the token axis
   one step of size 0.05 downhill: loss 3.828827 -> 2.935147   (still descends)
+  ...
   b1           7.62e-01   0.52006403  <-- wrong
+  ...
 
 injected bug: LayerNorm backward missing its two mean terms
   one step of size 0.05 downhill: loss 3.828827 -> 2.924399   (still descends)
+  ...
   X            5.12e-01   0.92334552  <-- wrong
 ```
+
+In both bug blocks the eight rows behind the `...` are unchanged from the
+clean run — `1.60e-16` to `4.84e-16`, cosine `1.00000000` throughout. That is
+the point: one row moves and the other eight look perfect.
 
 Neither bug shows up in the loss curve. The first keeps a cosine of `0.52`
 with the true gradient, so the step is still downhill and training looks
@@ -390,11 +433,14 @@ These bound what you can build on this:
   means rewriting every op to compose `Tensor`s — a design change, not a flag.
 - **float64 only**, on CPU, single-threaded. There is no dtype policy and no
   device concept.
-- **Per-op overhead dominates for small tensors.** About 3 µs of Python per
-  node. This is a teaching engine and a correctness reference, not a fast one;
-  panel 1 is a claim about asymptotics, not about beating BLAS.
-- **The graph retains every intermediate** until the root tensor is dropped. A
-  100,000-op chain holds 100,000 live `Tensor`s.
+- **Per-op overhead dominates for small tensors.** 3.0 to 4.7 µs of Python per
+  op on the loaded eight-core laptop these figures came from — see Depth for
+  the spread and the caveat. This is a teaching engine and a correctness
+  reference, not a fast one; panel 1 is a claim about asymptotics, not about
+  beating BLAS.
+- **The graph retains every intermediate** until the root tensor is dropped.
+  The 100,000-op chain above holds 200,001 live `Tensor`s: one per product,
+  one per wrapped scalar, plus the leaf.
 
 ## Where this sits
 

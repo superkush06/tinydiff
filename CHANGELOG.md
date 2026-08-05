@@ -1,5 +1,62 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- The README's spiral paragraph called the gradient fall after epoch 800 a
+  "three-decade drop" and then quoted two losses 1.5 decades apart, in one
+  sentence. Neither half survived re-measurement. Three decades is the *height
+  of the panel*: the per-layer EMA curves fall 1.50, 1.72 and 1.82 decades
+  from epoch 750 to 1499, the loss falls 1.53 decades over the same span, and
+  the largest fall any single curve makes over the whole run is 2.83 decades.
+  The quoted `0.064` was also anchored to epoch 750 inside a sentence about
+  epoch 800 (`loss[800]` is `0.0500`); the paragraph now anchors everything to
+  epoch 750, which `spiral.py` actually prints, and the printed block is no
+  longer trimmed.
+- Backward-pass wall-clock claims. "About 300 ms of pure Python, roughly 3 µs
+  per node" was the best case, not a typical one. Ten standalone best-of-three
+  trials plus five in-process sweeps put one 100,000-op backward pass between
+  300 ms and 470 ms (3.0 to 4.7 µs per op) on a machine whose load average ran
+  4.9 to 6.6 on eight cores. README and the Limitations bullet now quote the
+  range and say the machine was loaded.
+- "Per node" was also the wrong denominator: `y = y * m` wraps the scalar `m`
+  in a `Tensor` of its own, so the 100,000-op chain holds 200,001 live
+  `Tensor`s and the walk visits all of them. The Limitations bullet said
+  100,000.
+- Panel 2's caption claimed "every public op". The ledger in
+  `make_figures.correctness_ledger` runs fifteen of the sixteen public ops —
+  `neg` is not in it. `examples/validate.py` does cover `neg`, which is why
+  its sweep is 66 pairs where the panel's is 62. Caption now says so.
+- "About 440 lines of NumPy" held only on the tightest of three counting
+  rules. `tinydiff/*.py` is 654 physical lines, 492 non-blank/non-comment, 436
+  with docstrings also removed. The headline now gives 654 and 436 and names
+  the rule for each.
+- "124 tests, about 5 seconds" — measured 3.45 s, 3.83 s and 3.95 s wall on
+  three consecutive runs. Now "about 4 seconds". The 124/123 split was
+  re-confirmed against a matplotlib-free venv: 123 passed, 1 skipped.
+- "The closed forms in section 2 are what pin the last digits" pointed at
+  `validate.py`'s "Canonical functions"; the op-by-op closed forms are section
+  1. Same off-by-one fixed in `docs/validation.md`, which sourced the 62-cell
+  spread to §4 (66 cells) rather than to panel 2 of the engine report.
+- Panel B's "half a nat wrong" is `745 - 744.4401 = 0.56` nats; panel C's
+  finite-difference floor prints `3.2e-11`, not `3e-11`. `1e-6` sits 236× (not
+  "~240×") above the noisiest ledger cell — corrected in `docs/validation.md`
+  and `examples/validate.py`.
+- `fit_sine.py`'s "three orders of magnitude in 200 epochs" is a factor of 840
+  — 2.9 decades — from the two losses printed directly above the claim.
+- The `transformer_block.py` output blocks showed 3 of 9 and 1 of 9 parameter
+  rows with nothing to mark the cut. Rows elided are now marked `...`, the
+  nine-row list is named in the prose, and the elided rows' actual range
+  (`1.60e-16` to `4.84e-16`) is stated.
+- `tests/test_properties.py` was described by a ten-item list that reads as
+  exhaustive; there are seventeen invariants (21 collected cases). The prose
+  now gives the count and presents the list as ten of them.
+- The recursion cliff is 995 ops when `make_figures.py` runs the probe and 996
+  under `python -c` — it moves with the caller's stack depth. Panel 3's
+  caption now says that instead of implying a fixed constant.
+- `pyproject.toml` advertised "<500 LOC", true only on the
+  non-blank/non-comment count. Now states 654 lines.
+
 ## [0.4.1] - 2026-08-03
 
 ### Changed

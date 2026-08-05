@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tinydiff"
 version = "0.4.1"
-description = "Pedagogical reverse-mode autodiff in <500 LOC. Trains MLPs without PyTorch."
+description = "Pedagogical reverse-mode autodiff in 654 lines of NumPy. Trains MLPs without PyTorch."
 authors = [{name = "superkush06"}]
 readme = "README.md"
 requires-python = ">=3.11"

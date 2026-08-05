@@ -44,7 +44,7 @@ import tinydiff as td
 # 4e-11 relative, at h ~ 1e-5. At the h = 1e-6 the checker uses the floor is
 # higher, and it is measured rather than inferred: over the 62 (op, shape)
 # cells of the correctness figure the disagreement runs 2.99e-13 to 4.23e-09,
-# median 2.29e-10. 1e-6 sits ~240x above the noisiest of those cells (so the
+# median 2.29e-10. 1e-6 sits 236x above the noisiest of those cells (so the
 # estimator's noise never fails the check) and orders of magnitude below the
 # error of any genuinely wrong VJP, which is a factor, not a rounding.
 TOL_EXACT = 1e-12
