@@ -14,6 +14,13 @@ class Module:
     """Base class — recursively collects Tensors with requires_grad."""
 
     def parameters(self) -> list[Tensor]:
+        """Every requires_grad Tensor held by this Module, its attributes, or lists.
+
+        >>> import numpy as np, tinydiff as td
+        >>> net = td.Sequential(td.Linear(3, 4), td.relu, td.Linear(4, 2))
+        >>> [p.shape for p in net.parameters()]
+        [(3, 4), (4,), (4, 2), (2,)]
+        """
         out: list[Tensor] = []
         for _name, val in self.__dict__.items():
             if isinstance(val, Tensor) and val.requires_grad:
@@ -51,6 +58,16 @@ class Linear(Module):
     Kaiming-He uniform init for ReLU networks (the standard default).
     Pass an explicit `rng` for reproducible init; by default each layer
     draws from a shared process-wide generator.
+
+    >>> import numpy as np, tinydiff as td
+    >>> layer = td.Linear(3, 2, rng=np.random.default_rng(0))
+    >>> x = td.Tensor(np.ones((5, 3)))
+    >>> y = layer(x)
+    >>> y.shape
+    (5, 2)
+    >>> y.sum().backward()
+    >>> layer.W.grad.shape, layer.b.grad.tolist()   # one bias hit per row
+    ((3, 2), [5.0, 5.0])
     """
 
     def __init__(self, in_features: int, out_features: int, bias: bool = True,
@@ -70,7 +87,13 @@ class Linear(Module):
 
 
 class Sequential(Module):
-    """Apply layers in sequence; activations can be plain callables."""
+    """Apply layers in sequence; activations can be plain callables.
+
+    >>> import numpy as np, tinydiff as td
+    >>> net = td.Sequential(td.Linear(2, 4), td.relu, td.Linear(4, 1))
+    >>> net(td.Tensor(np.zeros((6, 2)))).shape
+    (6, 1)
+    """
 
     def __init__(self, *layers) -> None:
         self.layers = list(layers)

@@ -18,7 +18,21 @@ class Optimizer:
 
 
 class SGD(Optimizer):
-    """Vanilla SGD with optional momentum."""
+    """Vanilla SGD with optional momentum.
+
+    Two steps of ``lr=0.1`` on ``f(x) = x**2`` from x = 1: gradient 2.0 takes
+    it to 0.8, then gradient 1.6 takes it to 0.64.
+
+    >>> import numpy as np, tinydiff as td
+    >>> x = td.Tensor(np.array([1.0]), requires_grad=True)
+    >>> opt = td.SGD([x], lr=0.1)
+    >>> for _ in range(2):
+    ...     opt.zero_grad()
+    ...     (x * x).sum().backward()
+    ...     opt.step()
+    >>> x.data.tolist()
+    [0.64]
+    """
 
     def __init__(self, params, lr: float = 0.01, momentum: float = 0.0) -> None:
         super().__init__(params)
@@ -35,7 +49,19 @@ class SGD(Optimizer):
 
 
 class Adam(Optimizer):
-    """Adam (Kingma & Ba 2015)."""
+    """Adam (Kingma & Ba 2015).
+
+    The first step is `lr` in the downhill direction whatever the gradient's
+    magnitude — the scale-free property that makes Adam's default lr portable:
+
+    >>> import numpy as np, tinydiff as td
+    >>> x = td.Tensor(np.array([5.0]), requires_grad=True)
+    >>> opt = td.Adam([x], lr=0.1)
+    >>> (x * x).sum().backward()          # gradient is 10, step is still 0.1
+    >>> opt.step()
+    >>> x.data.round(6).tolist()
+    [4.9]
+    """
 
     def __init__(self, params, lr: float = 1e-3, betas: tuple[float, float] = (0.9, 0.999),
                  eps: float = 1e-8) -> None:

@@ -20,8 +20,12 @@ plot = ["matplotlib>=3.7"]
 include = ["tinydiff*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-ra -q"
+# `tinydiff` is in testpaths so that --doctest-modules picks up the worked
+# examples in the docstrings: every `>>>` block in the library is executed
+# and its output compared, the same guarantee the README examples get.
+testpaths = ["tests", "tinydiff"]
+addopts = "-ra -q --doctest-modules"
+doctest_optionflags = "NORMALIZE_WHITESPACE ELLIPSIS"
 
 [tool.ruff]
 line-length = 100

@@ -2,9 +2,10 @@
 
 [![ci](https://github.com/superkush06/tinydiff/actions/workflows/ci.yml/badge.svg)](https://github.com/superkush06/tinydiff/actions/workflows/ci.yml)
 
-Reverse-mode automatic differentiation in 654 lines of NumPy
+Reverse-mode automatic differentiation in 920 lines of NumPy
 (`wc -l tinydiff/*.py`), or 436 once blank lines, comments and docstrings come
-out.
+out — the gap is documentation, and every `>>>` block in it runs under
+`--doctest-modules` in CI.
 
 Run the forward pass once, walk the graph backwards once, and you have every
 partial derivative — all `n` of them — for roughly the cost of the forward

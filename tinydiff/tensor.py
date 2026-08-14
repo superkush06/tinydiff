@@ -17,6 +17,19 @@ import numpy as np
 
 
 class Tensor:
+    """A node in the computation graph: an array plus how it was produced.
+
+    >>> import tinydiff as td
+    >>> x = td.Tensor([1.0, 2.0], requires_grad=True)
+    >>> x.shape, x.ndim, x.grad is None
+    ((2,), 1, True)
+    >>> (x * x).sum().backward()
+    >>> x.grad.tolist()                   # d/dx sum(x^2) = 2x
+    [2.0, 4.0]
+    >>> x
+    Tensor(shape=(2,), op='', grad_shape=(2,))
+    """
+
     __slots__ = ("data", "grad", "requires_grad", "_children", "_backward",
                  "_op", "_backward_ran")
 
@@ -83,6 +96,20 @@ class Tensor:
         `retain_graph=True`; intermediate grads are cleared before each
         pass so leaves accumulate correctly instead of compounding stale
         intermediate values.
+
+        >>> import tinydiff as td
+        >>> x = td.Tensor(3.0, requires_grad=True)
+        >>> z = 2.0 * x * x               # dz/dx = 4x
+        >>> z.backward()
+        >>> float(x.grad)
+        12.0
+        >>> z.backward()
+        Traceback (most recent call last):
+            ...
+        RuntimeError: backward() was already called through this graph; ...
+        >>> z.backward(retain_graph=True)  # opt in: leaves accumulate to 24
+        >>> float(x.grad)
+        24.0
         """
         if grad is None:
             if self.data.size != 1:
@@ -118,13 +145,29 @@ class Tensor:
             t._backward()
 
     def zero_grad(self) -> None:
-        """Reset gradients on this tensor and all reachable ancestors."""
+        """Reset gradients on this tensor and all reachable ancestors.
+
+        >>> import tinydiff as td
+        >>> x = td.Tensor(2.0, requires_grad=True)
+        >>> y = x * x
+        >>> y.backward()
+        >>> y.zero_grad()
+        >>> x.grad is None
+        True
+        """
         for t in self._toposort():
             t.grad = None
 
 
 def _unbroadcast(grad: np.ndarray, shape: tuple[int, ...]) -> np.ndarray:
-    """Sum grad axes so it matches `shape` (inverse of numpy broadcasting)."""
+    """Sum grad axes so it matches `shape` (inverse of numpy broadcasting).
+
+    >>> import numpy as np
+    >>> _unbroadcast(np.ones((3, 2)), (2,)).tolist()      # leading axis summed away
+    [3.0, 3.0]
+    >>> _unbroadcast(np.ones((3, 2)), (3, 1)).tolist()    # collapsed axis kept
+    [[2.0], [2.0], [2.0]]
+    """
     # Remove leading singleton dims
     while grad.ndim > len(shape):
         grad = grad.sum(axis=0)
